@@ -48,11 +48,12 @@ withAutoQuit set@(AutoQuitSettings {..}) f = do
   killThread threadId
 
 withHeartBeat :: Chan HeartBeat -> Application -> Application
-withHeartBeat chan app req f = do
+withHeartBeat chan app request f = do
   writeChan chan Connect
-  let result = app req f  -- TODO check the order
-  writeChan chan Disconnect
-  result
+  app request $ \r -> do
+    response <- f r
+    writeChan chan Disconnect
+    return response
 
 wait :: AutoQuitSettings -> Chan HeartBeat -> IO ()
 wait (AutoQuitSettings {..}) chan = wait' 0 where

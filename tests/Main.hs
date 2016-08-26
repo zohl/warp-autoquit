@@ -75,6 +75,23 @@ spec = do
          , (5, "end")
          ]
 
+    it "does not die when serves requests" $ do
+      output <- withLog $ \log -> do
+        log "server start"
+        _ <- forkIO $ runServer port AutoQuitSettings {
+              aqsTimeout = 2 * scale'
+            , aqsOnExit = log "server exit"
+            }
+        _ <- forkIO $ ping port "slow" >> log "ping"
+        threadDelay' 7 >> log "end"
+
+      output `shouldBe` [
+           (0, "server start")
+         , (4, "ping")
+         , (6, "server exit")
+         , (7, "end")
+         ]
+
 type LogEntry = (UTCTime, String)
 type NormalizedLogEntry = (Int, String)
 type Log = IORef [LogEntry]
@@ -116,10 +133,11 @@ runServer port set = withAutoQuit set $ \chan -> run port (withHeartBeat chan ap
   app req f = dispatch >>= f where
     dispatch = case (rawPathInfo req) of
       "/fast" -> return respond200
-      "/slow" -> threadDelay 4 >> return respond200
+      "/slow" -> threadDelay' 4 >> return respond200
       _       -> return respond404
 
     headers = [(hContentType, "text/plain")]
 
     respond200 = responseLBS status404 headers "Not Found"
     respond404 = responseLBS status200 headers "OK"
+
