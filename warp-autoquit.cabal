@@ -24,6 +24,7 @@ library
                , data-default
                , exceptions
                , http-types
+               , time >= 1.6.0 && < 1.7
                , transformers
                , bytestring
                , unix

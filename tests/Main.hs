@@ -4,7 +4,7 @@ import Control.Arrow ((***))
 import Control.Concurrent (forkIO)
 import Control.Concurrent (threadDelay)
 import Data.IORef (IORef, newIORef, readIORef, atomicModifyIORef')
-import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime, NominalDiffTime, diffUTCTime, getCurrentTime)
 import Network.HTTP (simpleHTTP, getRequest)
 import Network.HTTP.Types (status200, status404)
 import Network.HTTP.Types.Header (hContentType)
@@ -42,7 +42,7 @@ spec = do
         log "begin"
         log "before server start"
         _ <- forkIO $ runServer port AutoQuitSettings {
-              aqsTimeout = 1 * scale'
+              aqsTimeout = 1 * scale
             , aqsOnExit = log "server exit"
             }
         log "after server start"
@@ -60,7 +60,7 @@ spec = do
       output <- withLog $ \log -> do
         log "server start"
         _ <- forkIO $ runServer port AutoQuitSettings {
-              aqsTimeout = 2 * scale'
+              aqsTimeout = 2 * scale
             , aqsOnExit = log "server exit"
             }
         threadDelay' 1 >> ping port "fast" >> log "ping"
@@ -79,7 +79,7 @@ spec = do
       output <- withLog $ \log -> do
         log "server start"
         _ <- forkIO $ runServer port AutoQuitSettings {
-              aqsTimeout = 2 * scale'
+              aqsTimeout = 2 * scale
             , aqsOnExit = log "server exit"
             }
         _ <- forkIO $ ping port "slow" >> log "ping"
@@ -96,20 +96,16 @@ type LogEntry = (UTCTime, String)
 type NormalizedLogEntry = (Int, String)
 type Log = IORef [LogEntry]
 
-scale :: Int
-scale = 10
-
-scale' :: Int
-scale' = 1000000 `div` scale
+scale :: NominalDiffTime
+scale = 0.10
 
 threadDelay' :: Int -> IO ()
-threadDelay' n = threadDelay . fromInteger . fromIntegral $ n * scale'
+threadDelay' n = threadDelay . (* n) . round . (* 1000000) $ scale
 
 normalize :: [LogEntry] -> [NormalizedLogEntry]
 normalize [] = []
-normalize xs = map ((round . (* scale'') . (flip diffUTCTime t)) *** id) xs where
+normalize xs = map ((round . (/ scale) . (flip diffUTCTime t)) *** id) xs where
   t = fst . head $ xs
-  scale'' = fromInteger . fromIntegral $ scale
 
 withLog :: ((String -> IO ()) -> IO ()) -> IO [NormalizedLogEntry]
 withLog f = do
@@ -140,4 +136,3 @@ runServer port set = withAutoQuit set $ \chan -> run port (withHeartBeat chan ap
 
     respond200 = responseLBS status404 headers "Not Found"
     respond404 = responseLBS status200 headers "OK"
-
