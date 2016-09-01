@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
   Module:      Network.Wai.Handler.Warp.AutoQuit
@@ -22,7 +23,9 @@ module Network.Wai.Handler.Warp.AutoQuit (
 
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
-import Control.Exception (Exception, throw)
+import Control.Exception (Exception)
+import Control.Monad.Catch (MonadThrow(..), catch, throwM)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (void, when)
 import Data.Default (Default, def)
 import Data.Time.Clock (NominalDiffTime)
@@ -59,14 +62,24 @@ instance (Exception AutoQuitException)
 
 data HeartBeat = Connect | Disconnect
 
+
 -- | Wrapper that kills the server after the timeout. It is supposed
 --   to be used in tandem with 'withHeartBeat'.
 withAutoQuit :: AutoQuitSettings -> (Chan HeartBeat -> IO a) -> IO ()
-withAutoQuit set@(AutoQuitSettings {..}) f = do
-  chan <- newChan
-  threadId <- forkIO . void $ f chan
+withAutoQuit set f = catch (withAutoQuitM set f) $
+  \(ex :: AutoQuitException) -> error $ show ex
+
+-- | Wrapper that kills the server after the timeout. It is supposed
+--   to be used in tandem with 'withHeartBeat'.
+withAutoQuitM :: forall a m. (MonadIO m, MonadThrow m)
+  => AutoQuitSettings
+  -> (Chan HeartBeat -> IO a)
+  -> m ()
+withAutoQuitM set@(AutoQuitSettings {..}) f = do
+  chan     <- liftIO $ newChan
+  threadId <- liftIO $ forkIO . void $ f chan
   wait set chan
-  killThread threadId
+  liftIO $ killThread threadId
 
 -- | Wrapper that sends signals when the application is active/inactive.
 withHeartBeat :: Chan HeartBeat -> Application -> Application
@@ -80,13 +93,18 @@ withHeartBeat chan app request f = do
 toMs :: NominalDiffTime -> Int
 toMs = round . (* 1000000)
 
-wait :: AutoQuitSettings -> Chan HeartBeat -> IO ()
+wait :: forall m. (MonadIO m, MonadThrow m) => AutoQuitSettings -> Chan HeartBeat -> m ()
 wait (AutoQuitSettings {..}) chan = wait' 0 where
-  wait' :: Int -> IO ()
-  wait' n = case n of
-    0 -> timeout (toMs aqsTimeout) (readChan chan) >>= fromMaybe aqsOnExit . (process n <$>)
-    _ -> readChan chan                             >>= process n
 
+  wait' :: Int -> m ()
+  wait' n = case n of
+    0 -> (liftIO wait'')          >>= fromMaybe (liftIO $ aqsOnExit) . (process n <$>)
+    _ -> (liftIO $ readChan chan) >>= process n
+
+  wait'' :: IO (Maybe HeartBeat)
+  wait'' = timeout (toMs aqsTimeout) (readChan chan)
+
+  process :: Int -> HeartBeat -> m ()
   process n Connect = wait' (n+1)
-  process n Disconnect = when (n == 0) (throw HeartBeatEventsMismatched) >> wait' (n-1)
+  process n Disconnect = when (n == 0) (throwM HeartBeatEventsMismatched) >> wait' (n-1)
 

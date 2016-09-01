@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Arrow ((***))
-import Control.Concurrent (forkIO)
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Monad (void)
 import Data.IORef (IORef, newIORef, readIORef, atomicModifyIORef')
 import Data.Time.Clock (UTCTime, NominalDiffTime, diffUTCTime, getCurrentTime)
 import Network.HTTP (simpleHTTP, getRequest)
@@ -97,7 +97,7 @@ type NormalizedLogEntry = (Int, String)
 type Log = IORef [LogEntry]
 
 scale :: NominalDiffTime
-scale = 0.10
+scale = 1.0
 
 threadDelay' :: Int -> IO ()
 threadDelay' n = threadDelay . (* n) . round . (* 1000000) $ scale
@@ -119,9 +119,7 @@ addEntry ref message = do
   atomicModifyIORef' ref $ \xs -> ((t, message):xs, ())
 
 ping :: Int -> String -> IO ()
-ping port path = do
-  r <- simpleHTTP . getRequest $ concat ["http://localhost:", show port, "/", path]
-  putStrLn (show r)
+ping port path = void $ simpleHTTP . getRequest $ concat ["http://localhost:", show port, "/", path]
 
 runServer :: Int -> AutoQuitSettings -> IO ()
 runServer port set = withAutoQuit set $ \chan -> run port (withHeartBeat chan app) where
