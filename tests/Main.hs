@@ -97,7 +97,7 @@ type NormalizedLogEntry = (Int, String)
 type Log = IORef [LogEntry]
 
 scale :: NominalDiffTime
-scale = 0.1
+scale = 1.0
 
 threadDelay' :: Int -> IO ()
 threadDelay' n = threadDelay . (* n) . round . (* 1000000) $ scale
