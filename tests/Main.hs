@@ -42,7 +42,7 @@ spec = do
         log "begin"
         log "before server start"
         _ <- forkIO $ runServer port AutoQuitSettings {
-              aqsTimeout = 1 * scale
+              aqsTimeout = Just $ 1 * scale
             , aqsOnExit = log "server exit"
             }
         log "after server start"
@@ -60,7 +60,7 @@ spec = do
       output <- withLog $ \log -> do
         log "server start"
         _ <- forkIO $ runServer port AutoQuitSettings {
-              aqsTimeout = 2 * scale
+              aqsTimeout = Just $ 2 * scale
             , aqsOnExit = log "server exit"
             }
         threadDelay' 1 >> ping port "fast" >> log "ping"
@@ -79,7 +79,7 @@ spec = do
       output <- withLog $ \log -> do
         log "server start"
         _ <- forkIO $ runServer port AutoQuitSettings {
-              aqsTimeout = 2 * scale
+              aqsTimeout = Just $ 2 * scale
             , aqsOnExit = log "server exit"
             }
         _ <- forkIO $ ping port "slow" >> log "ping"

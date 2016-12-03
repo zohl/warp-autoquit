@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns        #-}
 
 {-|
   Module:      Network.Wai.Handler.Warp.AutoQuit
@@ -37,7 +38,7 @@ import System.Timeout (timeout)
 
 -- | Options that determine quitting mechanism.
 data AutoQuitSettings = AutoQuitSettings {
-    aqsTimeout :: NominalDiffTime
+    aqsTimeout :: !(Maybe NominalDiffTime)
     -- ^ Time interval within which the server should still alive.
   , aqsOnExit  :: IO ()
     -- ^ An action to perform right after the timeout.
@@ -45,7 +46,7 @@ data AutoQuitSettings = AutoQuitSettings {
 
 instance Default AutoQuitSettings where
   def = AutoQuitSettings {
-      aqsTimeout = fromIntegral (5 * 60 :: Integer) -- 5 minutes
+      aqsTimeout = Just $ fromIntegral (5 * 60 :: Integer) -- 5 minutes
     , aqsOnExit  = return ()
     }
 
@@ -102,7 +103,10 @@ wait (AutoQuitSettings {..}) chan = wait' 0 where
     _ -> (liftIO $ readChan chan) >>= process n
 
   wait'' :: IO (Maybe HeartBeat)
-  wait'' = timeout (toMs aqsTimeout) (readChan chan)
+  wait'' = maybe
+    (Just <$> readChan chan)
+    (\t -> timeout (toMs t) (readChan chan))
+    aqsTimeout
 
   process :: Int -> HeartBeat -> m ()
   process n Connect = wait' (n+1)
