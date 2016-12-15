@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE CPP                 #-}
 
 {-|
   Module:      Network.Wai.Handler.Warp.AutoQuit
@@ -35,6 +36,9 @@ import Data.Typeable (Typeable)
 import Network.Wai (Application)
 import System.Timeout (timeout)
 
+#ifdef DebugConnections
+import Debug.Trace (traceIO)
+#endif
 
 -- | Options that determine quitting mechanism.
 data AutoQuitSettings = AutoQuitSettings {
@@ -86,9 +90,15 @@ withAutoQuitM set@(AutoQuitSettings {..}) f = do
 withHeartBeat :: Chan HeartBeat -> Application -> Application
 withHeartBeat chan app request f = do
   writeChan chan Connect
+#ifdef DebugConnections
+  traceIO "Connect"
+#endif
   app request $ \r -> do
     response <- f r
     writeChan chan Disconnect
+#ifdef DebugConnections
+    traceIO "Disconnect"
+#endif
     return response
 
 toMs :: NominalDiffTime -> Int

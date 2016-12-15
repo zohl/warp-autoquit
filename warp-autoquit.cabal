@@ -19,6 +19,11 @@ flag dev
   manual:             True
   default:            False
 
+flag debug-connections
+  description: Turn on output of connect/disconnect events.
+  manual:      False
+  default:     False
+
 library
   exposed-modules:     Network.Wai.Handler.Warp.AutoQuit
   other-extensions:
@@ -38,6 +43,9 @@ library
     ghc-options:      -Wall -Werror
   else
     ghc-options:      -O2 -Wall
+
+  if flag(debug-connections)
+    cpp-options: -DDebugConnections
 
 
 test-suite tests
