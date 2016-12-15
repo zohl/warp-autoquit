@@ -25,7 +25,7 @@ module Network.Wai.Handler.Warp.AutoQuit (
 
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
-import Control.Exception (Exception)
+import Control.Exception (Exception, finally)
 import Control.Monad.Catch (MonadThrow(..), catch, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (void, when)
@@ -65,7 +65,7 @@ data AutoQuitException
 instance (Exception AutoQuitException)
 
 
-data HeartBeat = Connect | Disconnect
+data HeartBeat = Connect | Disconnect deriving (Eq, Show)
 
 
 -- | Wrapper that kills the server after the timeout. It is supposed
@@ -86,25 +86,27 @@ withAutoQuitM set@(AutoQuitSettings {..}) f = do
   wait set chan
   liftIO $ killThread threadId
 
+writeChan' :: (Show a) => Chan a -> a -> IO ()
+writeChan' chan x = do
+  writeChan chan x
+#ifdef DebugConnections
+  traceIO . show $ x
+#endif
+
 -- | Wrapper that sends signals when the application is active/inactive.
 withHeartBeat :: Chan HeartBeat -> Application -> Application
 withHeartBeat chan app request f = do
-  writeChan chan Connect
-#ifdef DebugConnections
-  traceIO "Connect"
-#endif
-  app request $ \r -> do
-    response <- f r
-    writeChan chan Disconnect
-#ifdef DebugConnections
-    traceIO "Disconnect"
-#endif
-    return response
+  writeChan' chan Connect
+  (app request f) `finally` (writeChan' chan Disconnect)
 
 toMs :: NominalDiffTime -> Int
 toMs = round . (* 1000000)
 
-wait :: forall m. (MonadIO m, MonadThrow m) => AutoQuitSettings -> Chan HeartBeat -> m ()
+wait :: forall m. (MonadIO m, MonadThrow m)
+  => AutoQuitSettings
+  -> Chan HeartBeat
+  -> m ()
+
 wait (AutoQuitSettings {..}) chan = wait' 0 where
 
   wait' :: Int -> m ()

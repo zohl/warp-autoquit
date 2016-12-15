@@ -87,9 +87,31 @@ spec = do
 
       output `shouldBe` [
            (0, "server start")
+
          , (4, "ping")
          , (6, "server exit")
          , (7, "end")
+         ]
+
+    it "automatically quits even if error has happened" $ do
+      output <- withLog $ \log -> do
+        log "server start"
+        _ <- forkIO $ runServer port AutoQuitSettings {
+              aqsTimeout = Just $ 2 * scale
+            , aqsOnExit = log "server exit"
+            }
+        _ <- forkIO $
+             threadDelay' 1 >> ping port "fast" >> log "ping"
+          >> threadDelay' 1 >> ping port "error" >> log "error"
+
+        threadDelay' 5 >> log "end"
+
+      output `shouldBe` [
+           (0, "server start")
+         , (1, "ping")
+         , (2, "error")
+         , (4, "server exit")
+         , (5, "end")
          ]
 
 type LogEntry = (UTCTime, String)
@@ -126,9 +148,10 @@ runServer port set = withAutoQuit set $ \chan -> run port (withHeartBeat chan ap
   app :: Application
   app req f = dispatch >>= f where
     dispatch = case (rawPathInfo req) of
-      "/fast" -> return respond200
-      "/slow" -> threadDelay' 4 >> return respond200
-      _       -> return respond404
+      "/fast"  -> return respond200
+      "/slow"  -> threadDelay' 4 >> return respond200
+      "/error" -> error "failed"
+      _        -> return respond404
 
     headers = [(hContentType, "text/plain")]
 
