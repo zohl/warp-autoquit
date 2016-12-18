@@ -86,7 +86,11 @@ withAutoQuitM set@(AutoQuitSettings {..}) f = do
   wait set chan
   liftIO $ killThread threadId
 
-writeChan' :: (Show a) => Chan a -> a -> IO ()
+writeChan' ::
+#ifdef DebugConnections
+  (Show a) =>
+#endif
+  Chan a -> a -> IO ()
 writeChan' chan x = do
   writeChan chan x
 #ifdef DebugConnections
