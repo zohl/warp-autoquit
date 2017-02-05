@@ -6,4 +6,4 @@
 ### Added
 - Working version of package.
 
-[Unreleased]: ../compare/v0.1.0...HEAD
+[Unreleased]: ../../compare/v0.1.0...HEAD

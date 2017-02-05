@@ -7,5 +7,5 @@
 A haskell analog of [nodejs-autoquit](https://github.com/rubenv/node-autoquit) that was made in it's image, after it's likeness.
 
 ## See also
-[Changelog](../master/CHANGELOG.md)
-[Example](../master/src/tests/Main.hs#L147)
+- [Changelog](../master/CHANGELOG.md)
+- [Example](../master/tests/Main.hs#L147)
