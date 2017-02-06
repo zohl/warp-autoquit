@@ -87,7 +87,6 @@ spec = do
 
       output `shouldBe` [
            (0, "server start")
-
          , (4, "ping")
          , (6, "server exit")
          , (7, "end")

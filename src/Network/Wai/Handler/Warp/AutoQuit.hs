@@ -26,7 +26,7 @@ module Network.Wai.Handler.Warp.AutoQuit (
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Control.Exception (Exception, finally)
-import Control.Monad.Catch (MonadThrow(..), catch, throwM)
+import Control.Monad.Catch (MonadThrow(..), throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (void, when)
 import Data.Default (Default, def)
@@ -70,17 +70,11 @@ data HeartBeat = Connect | Disconnect deriving (Eq, Show)
 
 -- | Wrapper that kills the server after the timeout. It is supposed
 --   to be used in tandem with 'withHeartBeat'.
-withAutoQuit :: AutoQuitSettings -> (Chan HeartBeat -> IO a) -> IO ()
-withAutoQuit set f = catch (withAutoQuitM set f) $
-  \(ex :: AutoQuitException) -> error $ show ex
-
--- | Wrapper that kills the server after the timeout. It is supposed
---   to be used in tandem with 'withHeartBeat'.
-withAutoQuitM :: forall a m. (MonadIO m, MonadThrow m)
+withAutoQuit :: forall a m. (MonadIO m, MonadThrow m)
   => AutoQuitSettings
   -> (Chan HeartBeat -> IO a)
   -> m ()
-withAutoQuitM set@(AutoQuitSettings {..}) f = do
+withAutoQuit set@(AutoQuitSettings {..}) f = do
   chan     <- liftIO $ newChan
   threadId <- liftIO $ forkIO . void $ f chan
   wait set chan
